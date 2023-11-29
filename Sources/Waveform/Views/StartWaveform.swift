@@ -8,14 +8,17 @@ public struct StartWaveform: View {
     
     @State private var zoomGestureValue: CGFloat = 1
     @State private var panGestureValue: CGFloat = 0
-    @State private var selectedSamples: SampleRange = 0..<1
     
     @Binding var startSample: Int
+    
+    // Computed property for selectedSamples
+    private var selectedSamples: SampleRange {
+        startSample..<Int(generator.audioBuffer.frameLength)
+    }
     
     public init(generator: WaveformGenerator, startSample: Binding<Int>) {
         self.generator = generator
         self._startSample = startSample
-        self.selectedSamples = startSample..<Int(generator.audioBuffer.frameLength)
     }
     
     public var body: some View {
@@ -23,10 +26,11 @@ public struct StartWaveform: View {
             ZStack {
                 Rectangle()
                     .foregroundColor(Color(.systemBackground).opacity(0.01))
-                
+                 
                 Renderer(waveformData: generator.sampleData)
                     .preference(key: SizeKey.self, value: geometry.size)
                 
+                // Use the computed selectedSamples here
                 Highlight(selectedSamples: selectedSamples)
                     .foregroundColor(.accentColor)
                     .opacity(0.7)
