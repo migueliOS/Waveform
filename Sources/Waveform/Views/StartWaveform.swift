@@ -32,10 +32,11 @@ public struct StartWaveform: View {
                 Renderer(waveformData: generator.sampleData)
                     .preference(key: SizeKey.self, value: geometry.size)
                 
-                
-                Highlight(selectedSamples: selectedSamples)
-                    .foregroundColor(.accentColor)
-                    .opacity(0.7)
+                if !generator.sampleData.isEmpty {
+                    Highlight(selectedSamples: selectedSamples)
+                        .foregroundColor(.accentColor)
+                        .opacity(0.7)
+                }
             }
             .padding(.bottom, selectionEnabled ? 30 : 0)
         }
