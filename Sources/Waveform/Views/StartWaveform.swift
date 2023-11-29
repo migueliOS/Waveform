@@ -8,34 +8,36 @@ public struct StartWaveform: View {
     
     @State private var zoomGestureValue: CGFloat = 1
     @State private var panGestureValue: CGFloat = 0
+    @Binding var selectedSamples: SampleRange
+    @Binding var selectionEnabled: Bool
     
-    @Binding var startSample: Int
-    
-    // Computed property for selectedSamples
-    private var selectedSamples: SampleRange {
-        startSample..<Int(generator.audioBuffer.frameLength)
-    }
-    
-    public init(generator: WaveformGenerator, startSample: Binding<Int>) {
+    /// Creates an instance powered by the supplied generator.
+    /// - Parameters:
+    ///   - generator: The object that will supply waveform data.
+    ///   - selectedSamples: A binding to a `SampleRange` to update with the selection chosen in the waveform.
+    ///   - selectionEnabled: A binding to enable/disable selection on the waveform
+    public init(generator: WaveformGenerator, selectedSamples: Binding<SampleRange>, selectionEnabled: Binding<Bool>) {
         self.generator = generator
-        self._startSample = startSample
+        self._selectedSamples = selectedSamples
+        self._selectionEnabled = selectionEnabled
     }
     
     public var body: some View {
         GeometryReader { geometry in
             ZStack {
+                // invisible rectangle needed to register gestures that aren't on top of the waveform
                 Rectangle()
                     .foregroundColor(Color(.systemBackground).opacity(0.01))
-                 
+                
                 Renderer(waveformData: generator.sampleData)
                     .preference(key: SizeKey.self, value: geometry.size)
                 
-                // Use the computed selectedSamples here
+                
                 Highlight(selectedSamples: selectedSamples)
                     .foregroundColor(.accentColor)
                     .opacity(0.7)
             }
-            .padding(.bottom, 30)
+            .padding(.bottom, selectionEnabled ? 30 : 0)
         }
         .gesture(SimultaneousGesture(zoom, pan))
         .environmentObject(generator)
@@ -47,24 +49,28 @@ public struct StartWaveform: View {
     
     var zoom: some Gesture {
         MagnificationGesture()
-            .onChanged { value in
-                zoom(amount: value / zoomGestureValue)
-                zoomGestureValue = value
+            .onChanged {
+                let zoomAmount = $0 / zoomGestureValue
+                zoom(amount: zoomAmount)
+                zoomGestureValue = $0
             }
-            .onEnded { value in
-                zoom(amount: value / zoomGestureValue)
+            .onEnded {
+                let zoomAmount = $0 / zoomGestureValue
+                zoom(amount: zoomAmount)
                 zoomGestureValue = 1
             }
     }
     
     var pan: some Gesture {
         DragGesture()
-            .onChanged { value in
-                pan(offset: value.translation.width - panGestureValue)
-                panGestureValue = value.translation.width
+            .onChanged {
+                let panAmount = $0.translation.width - panGestureValue
+                pan(offset: -panAmount)
+                panGestureValue = $0.translation.width
             }
-            .onEnded { value in
-                pan(offset: value.translation.width - panGestureValue)
+            .onEnded {
+                let panAmount = $0.translation.width - panGestureValue
+                pan(offset: -panAmount)
                 panGestureValue = 0
             }
     }
