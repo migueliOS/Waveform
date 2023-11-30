@@ -24,10 +24,12 @@ public struct StartWaveform: View {
         selectedSamples: Binding<SampleRange>,
         playingSamples: Binding<SampleRange>,
         selectedColor: Color,
-        playingColor: Color
+        playingColor: Color,
+        zoom: CGFloat
     ) {
         self._selectedSamples = selectedSamples
         self._playingSamples = playingSamples
+        self.zoomGestureValue = zoom
         self.generator = generator
         self.selectedColor = selectedColor
         self.playingColor = playingColor
