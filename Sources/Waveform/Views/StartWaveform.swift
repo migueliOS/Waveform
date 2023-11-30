@@ -9,17 +9,28 @@ public struct StartWaveform: View {
     @State private var zoomGestureValue: CGFloat = 1
     @State private var panGestureValue: CGFloat = 0
     @Binding var selectedSamples: SampleRange
-    @Binding var selectionEnabled: Bool
+    @Binding var playingSamples: SampleRange
+    
+    private let selectedColor: Color
+    private let playingColor: Color
     
     /// Creates an instance powered by the supplied generator.
     /// - Parameters:
     ///   - generator: The object that will supply waveform data.
     ///   - selectedSamples: A binding to a `SampleRange` to update with the selection chosen in the waveform.
     ///   - selectionEnabled: A binding to enable/disable selection on the waveform
-    public init(generator: WaveformGenerator, selectedSamples: Binding<SampleRange>, selectionEnabled: Binding<Bool>) {
+    public init(
+        generator: WaveformGenerator,
+        selectedSamples: Binding<SampleRange>,
+        playingSamples: Binding<SampleRange>,
+        selectedColor: Color,
+        playingColor: Color
+    ) {
         self._selectedSamples = selectedSamples
-        self._selectionEnabled = selectionEnabled
+        self._playingSamples = playingSamples
         self.generator = generator
+        self.selectedColor = selectedColor
+        self.playingColor = playingColor
     }
     
     public var body: some View {
@@ -34,11 +45,15 @@ public struct StartWaveform: View {
                 
                 if !generator.sampleData.isEmpty {
                     Highlight(selectedSamples: selectedSamples)
-                        .foregroundColor(.accentColor)
-                        .opacity(0.7)
+                        .foregroundColor(selectedColor)
+                        .opacity(0.5)
+                    Highlight(selectedSamples: playingSamples)
+                        .foregroundColor(playingColor)
+                        .opacity(0.5)
+
                 }
             }
-            .padding(.bottom, selectionEnabled ? 30 : 0)
+            .padding(.bottom, 30)
         }
         .gesture(SimultaneousGesture(zoom, pan))
         .environmentObject(generator)
