@@ -5,11 +5,9 @@ import Accelerate
 /// An interactive waveform generated from an `AVAudioFile`.
 public struct StartWaveform: View {
     @ObservedObject var generator: WaveformGenerator
-    
-    @State private var zoomGestureValue: CGFloat = 1
-    @State private var panGestureValue: CGFloat = 0
     @Binding var selectedSamples: SampleRange
     @Binding var playingSamples: SampleRange
+    @Binding var zoom: CGFloat
     
     private let selectedColor: Color
     private let playingColor: Color
@@ -29,7 +27,7 @@ public struct StartWaveform: View {
     ) {
         self._selectedSamples = selectedSamples
         self._playingSamples = playingSamples
-        self._zoomGestureValue = State(wrappedValue: zoom.wrappedValue)
+        self._zoom = zoom
         self.generator = generator
         self.selectedColor = selectedColor
         self.playingColor = playingColor
@@ -57,42 +55,16 @@ public struct StartWaveform: View {
             }
             .padding(.bottom, 30)
         }
-        .gesture(SimultaneousGesture(zoom, pan))
+        .onChange(of: zoom) { newZoom  in
+            zoom(amount: newZoom)
+        }
         .environmentObject(generator)
         .onPreferenceChange(SizeKey.self) {
             guard generator.width != $0.width else { return }
             generator.width = $0.width
         }
     }
-    
-    var zoom: some Gesture {
-        MagnificationGesture()
-            .onChanged {
-                let zoomAmount = $0 / zoomGestureValue
-                zoom(amount: zoomAmount)
-                zoomGestureValue = $0
-            }
-            .onEnded {
-                let zoomAmount = $0 / zoomGestureValue
-                zoom(amount: zoomAmount)
-                zoomGestureValue = 1
-            }
-    }
-    
-    var pan: some Gesture {
-        DragGesture()
-            .onChanged {
-                let panAmount = $0.translation.width - panGestureValue
-                pan(offset: -panAmount)
-                panGestureValue = $0.translation.width
-            }
-            .onEnded {
-                let panAmount = $0.translation.width - panGestureValue
-                pan(offset: -panAmount)
-                panGestureValue = 0
-            }
-    }
-    
+
     func zoom(amount: CGFloat) {
         let count = generator.renderSamples.count
         let newCount = CGFloat(count) / amount
