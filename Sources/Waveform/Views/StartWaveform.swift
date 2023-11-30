@@ -17,9 +17,9 @@ public struct StartWaveform: View {
     ///   - selectedSamples: A binding to a `SampleRange` to update with the selection chosen in the waveform.
     ///   - selectionEnabled: A binding to enable/disable selection on the waveform
     public init(generator: WaveformGenerator, selectedSamples: Binding<SampleRange>, selectionEnabled: Binding<Bool>) {
-        self.generator = generator
         self._selectedSamples = selectedSamples
         self._selectionEnabled = selectionEnabled
+        self.generator = generator
     }
     
     public var body: some View {
