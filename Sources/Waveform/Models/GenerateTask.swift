@@ -3,10 +3,24 @@ import Accelerate
 
 class GenerateTask {
     let audioBuffer: AVAudioPCMBuffer
-    private var isCancelled = false
+    private var _isCancelled = false
+    private let cancelLock = NSLock()
     
     init(audioBuffer: AVAudioPCMBuffer) {
         self.audioBuffer = audioBuffer
+    }
+    
+    var isCancelled: Bool {
+        get {
+            cancelLock.lock()
+            defer { cancelLock.unlock() }
+            return _isCancelled
+        }
+        set {
+            cancelLock.lock()
+            _isCancelled = newValue
+            cancelLock.unlock()
+        }
     }
     
     func cancel() {
@@ -18,8 +32,8 @@ class GenerateTask {
         
         DispatchQueue.global(qos: .userInteractive).async {
             let channels = Int(self.audioBuffer.format.channelCount)
-            let length = renderSamples.count
-            let samplesPerPoint = length / Int(width)
+            let totalSamples = renderSamples.upperBound - renderSamples.lowerBound
+            let samplesPerPoint = max(1, totalSamples / Int(width))
             
             guard let floatChannelData = self.audioBuffer.floatChannelData else { return }
             
@@ -27,20 +41,21 @@ class GenerateTask {
                 // don't begin work if the task has been cancelled
                 guard !self.isCancelled else { return }
                 
+                let startIdx = renderSamples.lowerBound + (point * samplesPerPoint)
+                let endIdx = min(startIdx + samplesPerPoint, renderSamples.upperBound)
+                let validLength = vDSP_Length(max(0, endIdx - startIdx))
+                
                 var data: SampleData = .zero
                 for channel in 0..<channels {
-                    let pointer = floatChannelData[channel].advanced(by: renderSamples.lowerBound + (point * samplesPerPoint))
+                    let pointer = floatChannelData[channel].advanced(by: startIdx)
                     let stride = vDSP_Stride(self.audioBuffer.stride)
-                    let length = vDSP_Length(samplesPerPoint)
                     
                     var value: Float = 0
                     
-                    // calculate minimum value for point
-                    vDSP_minv(pointer, stride, &value, length)
+                    vDSP_minv(pointer, stride, &value, validLength)
                     data.min = min(value, data.min)
                     
-                    // calculate maximum value for point
-                    vDSP_maxv(pointer, stride, &value, length)
+                    vDSP_maxv(pointer, stride, &value, validLength)
                     data.max = max(value, data.max)
                 }
                 
@@ -49,7 +64,6 @@ class GenerateTask {
             }
             
             DispatchQueue.main.async {
-                // don't call completion if the task has been cancelled
                 guard !self.isCancelled else { return }
                 completion(sampleData)
             }

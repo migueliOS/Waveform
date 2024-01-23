@@ -38,24 +38,14 @@ public class WaveformGenerator: ObservableObject {
         self.renderSamples = 0..<Int(capacity)
     }
     
-    /// Creates an instance from an `AVAudioFile` and a `CMTimeRange`.
-    /// - Parameters:
-    ///   - audioFile: The audio file to generate waveform data from.
-    ///   - timeRange: The time range of the audio file to use.
-    public init?(audioFile: AVAudioFile, timeRange: CMTimeRange) {
-        let sampleRate = audioFile.processingFormat.sampleRate
-        let startFrame = AVAudioFramePosition(timeRange.start.seconds * sampleRate)
-        let endFrame = AVAudioFramePosition(CMTimeAdd(timeRange.start, timeRange.duration).seconds * sampleRate)
-        let frameCount = AVAudioFrameCount(endFrame - startFrame)
-        
-        guard let audioBuffer = AVAudioPCMBuffer(pcmFormat: audioFile.processingFormat, frameCapacity: frameCount) else { return nil }
+    // Creates an instance from an `AVAudioFile`.
+    /// - Parameter audioFile: The audio file to generate waveform data from.
+    public init?(audioFile: AVAudioFile, startFrame: Int) {
+        let capacity = AVAudioFrameCount(audioFile.length)
+        guard let audioBuffer = AVAudioPCMBuffer(pcmFormat: audioFile.processingFormat, frameCapacity: capacity) else { return nil }
         
         do {
-            // Move the reading position to the start frame
-            audioFile.framePosition = startFrame
-            
-            // Read the frames into the buffer
-            try audioFile.read(into: audioBuffer, frameCount: frameCount)
+            try audioFile.read(into: audioBuffer)
         } catch let error {
             print(error.localizedDescription)
             return nil
@@ -63,7 +53,7 @@ public class WaveformGenerator: ObservableObject {
         
         self.audioFile = audioFile
         self.audioBuffer = audioBuffer
-        self.renderSamples = Int(startFrame)..<Int(endFrame)
+        self.renderSamples = startFrame..<Int(capacity)
     }
     
     func refreshData() {
