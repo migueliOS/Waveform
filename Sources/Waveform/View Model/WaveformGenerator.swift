@@ -64,7 +64,11 @@ public class WaveformGenerator: ObservableObject {
             self.sampleData = sampleData
         }
     }
-    
+
+    public func cancel() {
+        generateTask?.cancel()
+    }
+
     // MARK: Conversions
     func position(of sample: Int) -> CGFloat {
         let radio = width / CGFloat(renderSamples.count)

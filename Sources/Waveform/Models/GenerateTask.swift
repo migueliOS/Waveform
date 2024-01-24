@@ -5,11 +5,12 @@ class GenerateTask {
     let audioBuffer: AVAudioPCMBuffer
     private var _isCancelled = false
     private let cancelLock = NSLock()
-    
+    private var workItems = [DispatchWorkItem]()
+
     init(audioBuffer: AVAudioPCMBuffer) {
         self.audioBuffer = audioBuffer
     }
-    
+
     var isCancelled: Bool {
         get {
             cancelLock.lock()
@@ -22,24 +23,27 @@ class GenerateTask {
             cancelLock.unlock()
         }
     }
-    
+
     func cancel() {
         isCancelled = true
+        workItems.forEach { $0.cancel() }
     }
-    
+
     func resume(width: CGFloat, renderSamples: SampleRange, completion: @escaping ([SampleData]) -> Void) {
         var sampleData = [SampleData](repeating: .zero, count: Int(width))
+        var tempSampleData = [SampleData?](repeating: nil, count: Int(width))
+        workItems = []
         
-        DispatchQueue.global(qos: .userInteractive).async {
-            let channels = Int(self.audioBuffer.format.channelCount)
-            let totalSamples = renderSamples.upperBound - renderSamples.lowerBound
-            let samplesPerPoint = max(1, totalSamples / Int(width))
-            
-            guard let floatChannelData = self.audioBuffer.floatChannelData else { return }
-            
-            DispatchQueue.concurrentPerform(iterations: Int(width)) { point in
-                // don't begin work if the task has been cancelled
-                guard !self.isCancelled else { return }
+        let group = DispatchGroup()
+        let dataCollectionQueue = DispatchQueue(label: "dataCollectionQueue", attributes: .concurrent)
+        
+        for point in 0..<Int(width) {
+            let workItem = DispatchWorkItem {
+                let channels = Int(self.audioBuffer.format.channelCount)
+                let totalSamples = renderSamples.upperBound - renderSamples.lowerBound
+                let samplesPerPoint = max(1, totalSamples / Int(width))
+                
+                guard let floatChannelData = self.audioBuffer.floatChannelData else { return }
                 
                 let startIdx = renderSamples.lowerBound + (point * samplesPerPoint)
                 let endIdx = min(startIdx + samplesPerPoint, renderSamples.upperBound)
@@ -59,12 +63,25 @@ class GenerateTask {
                     data.max = max(value, data.max)
                 }
                 
-                // sync to hold completion handler until all iterations are complete
-                DispatchQueue.main.sync { sampleData[point] = data }
+                dataCollectionQueue.async(flags: .barrier) {
+                    tempSampleData[point] = data
+                }
+                
+                // Check for cancellation inside the work item
+                guard !self.isCancelled else { return }
             }
             
-            DispatchQueue.main.async {
-                guard !self.isCancelled else { return }
+            workItems.append(workItem)
+            DispatchQueue.global(qos: .userInteractive).async(group: group, execute: workItem)
+        }
+        
+        group.notify(queue: .main) {
+            if !self.isCancelled {
+                for point in 0..<Int(width) {
+                    if let data = tempSampleData[point] {
+                        sampleData[point] = data
+                    }
+                }
                 completion(sampleData)
             }
         }
